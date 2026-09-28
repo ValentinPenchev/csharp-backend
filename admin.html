@@ -12,9 +12,9 @@
             <span class="text-xs bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full font-semibold">Администратор</span>
         </header>
 
-        <!-- Създаване на ново задание -->
+        <!-- Създаване на ново задание с еталонен файл -->
         <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-8">
-            <h2 class="text-lg font-semibold mb-4 text-slate-800">Създай ново задание</h2>
+            <h2 class="text-lg font-semibold mb-4 text-slate-800">Създай ново задание и еталон за проверка</h2>
             <form id="create-form" class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-slate-600 mb-1">Заглавие на задачата</label>
@@ -24,14 +24,20 @@
                     <label class="block text-sm font-medium text-slate-600 mb-1">Описание / Условия</label>
                     <textarea id="description" rows="3" required class="w-full px-4 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"></textarea>
                 </div>
-                <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-5 py-2.5 rounded-xl text-sm transition shadow-sm">Създай и генерирай линк</button>
+                <div>
+                    <label class="block text-sm font-medium text-slate-600 mb-1">Примерен код / Word файл с критерии (за проверка)</label>
+                    <input type="file" id="reference-file" class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                </div>
+                <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-5 py-2.5 rounded-xl text-sm transition shadow-sm">Създай задача и генерирай линк</button>
             </form>
         </div>
 
         <!-- Списък със задачи и техните линкове -->
         <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-8">
-            <h2 class="text-lg font-semibold mb-4 text-slate-800">Активни задания</h2>
-            <div id="assignments-list" class="space-y-3"></div>
+            <h2 class="text-lg font-semibold mb-4 text-slate-800">Активни задания и индивидуални линкове</h2>
+            <div id="assignments-list" class="space-y-3">
+                <p class="text-sm text-slate-400">Зареждане на задания...</p>
+            </div>
         </div>
 
         <!-- Предадени материали и оценки -->
@@ -43,7 +49,7 @@
                         <tr class="border-b border-slate-200 text-slate-500">
                             <th class="py-3 px-4">Ученик</th>
                             <th class="py-3 px-4">Задание</th>
-                            <th class="py-3 px-4">Файл</th>
+                            <th class="py-3 px-4">Файл на ученика</th>
                             <th class="py-3 px-4">Точки</th>
                             <th class="py-3 px-4">Оценка</th>
                             <th class="py-3 px-4">Действие</th>
@@ -56,30 +62,40 @@
     </div>
 
     <script>
-        const API_URL = "https://grading-platform-v2.onrender.com/";
+        const API_URL = "https://grading-platform-v2.onrender.com"; // Вашият Render линк
 
         async function loadData() {
             try {
+                // Зареждане на задания
                 const resAss = await fetch(`${API_URL}/api/assignments`);
                 const assignments = await resAss.json();
                 const listEl = document.getElementById('assignments-list');
                 listEl.innerHTML = '';
                 
+                if (assignments.length === 0) {
+                    listEl.innerHTML = '<p class="text-sm text-slate-500">Все още няма създадени задания.</p>';
+                }
+
                 assignments.forEach(a => {
-                    const studentLink = `${window.location.origin}${window.location.pathname.replace('admin.html', '')}index.html?id=${a.id}`;
+                    // Генериране на линк спрямо текущия хост (GitHub Pages) или рутьовете
+                    const baseDomain = window.location.origin + window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
+                    const studentLink = `${baseDomain}index.html?id=${a.id}`;
+                    
                     listEl.innerHTML += `
-                        <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+                        <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
                             <div>
                                 <h3 class="font-semibold text-slate-800">${a.title}</h3>
                                 <p class="text-xs text-slate-500">${a.description}</p>
+                                ${a.reference_file_url ? `<a href="${a.reference_file_url}" target="_blank" class="text-xs text-indigo-600 hover:underline mt-1 inline-block">📄 Преглед на еталонен/помощен файл</a>` : ''}
                             </div>
-                            <div class="flex items-center gap-2">
-                                <input type="text" readonly value="${studentLink}" class="bg-white border px-3 py-1 rounded text-xs text-slate-600 w-64 select-all">
-                                <button onclick="navigator.clipboard.writeText('${studentLink}')" class="bg-slate-200 hover:bg-slate-300 px-3 py-1 rounded text-xs font-medium">Копирай линк</button>
+                            <div class="flex items-center gap-2 w-full md:w-auto">
+                                <input type="text" readonly value="${studentLink}" class="bg-white border px-3 py-1.5 rounded-lg text-xs text-slate-600 w-full md:w-80 select-all">
+                                <button onclick="navigator.clipboard.writeText('${studentLink}'); alert('Линкът е копиран!');" class="bg-slate-200 hover:bg-slate-300 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap">Копирай</button>
                             </div>
                         </div>`;
                 });
 
+                // Зареждане на предадени материали
                 const resSub = await fetch(`${API_URL}/api/submissions`);
                 const submissions = await resSub.json();
                 const subListEl = document.getElementById('submissions-list');
@@ -103,17 +119,21 @@
 
         document.getElementById('create-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const title = document.getElementById('title').value;
-            const description = document.getElementById('description').value;
+            const formData = new FormData();
+            formData.append('title', document.getElementById('title').value);
+            formData.append('description', document.getElementById('description').value);
+            
+            const refFile = document.getElementById('reference-file').files[0];
+            if (refFile) {
+                formData.append('referenceFile', refFile);
+            }
 
             await fetch(`${API_URL}/api/assignments`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title, description })
+                body: formData
             });
 
-            document.getElementById('title').value = '';
-            document.getElementById('description').value = '';
+            document.getElementById('create-form').reset();
             loadData();
         });
 
