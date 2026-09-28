@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <title>Админ панел - C# Проверител</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen">
+    <div class="max-w-6xl mx-auto px-4 py-8">
+        <header class="mb-8 flex justify-between items-center border-b pb-4">
+            <h1 class="text-2xl font-bold tracking-tight text-slate-900">Управление на Задания</h1>
+            <span class="text-xs bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full font-semibold">Администратор</span>
+        </header>
+
+        <!-- Създаване на ново задание -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-8">
+            <h2 class="text-lg font-semibold mb-4 text-slate-800">Създай ново задание</h2>
+            <form id="create-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-600 mb-1">Заглавие на задачата</label>
+                    <input type="text" id="title" required class="w-full px-4 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-600 mb-1">Описание / Условия</label>
+                    <textarea id="description" rows="3" required class="w-full px-4 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm"></textarea>
+                </div>
+                <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-5 py-2.5 rounded-xl text-sm transition shadow-sm">Създай и генерирай линк</button>
+            </form>
+        </div>
+
+        <!-- Списък със задачи и техните линкове -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-8">
+            <h2 class="text-lg font-semibold mb-4 text-slate-800">Активни задания</h2>
+            <div id="assignments-list" class="space-y-3"></div>
+        </div>
+
+        <!-- Предадени материали и оценки -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <h2 class="text-lg font-semibold mb-4 text-slate-800">Предадени материали от ученици</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-200 text-slate-500">
+                            <th class="py-3 px-4">Ученик</th>
+                            <th class="py-3 px-4">Задание</th>
+                            <th class="py-3 px-4">Файл</th>
+                            <th class="py-3 px-4">Точки</th>
+                            <th class="py-3 px-4">Оценка</th>
+                            <th class="py-3 px-4">Действие</th>
+                        </tr>
+                    </thead>
+                    <tbody id="submissions-list"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "https://grading-platform-v2.onrender.com/";
+
+        async function loadData() {
+            try {
+                const resAss = await fetch(`${API_URL}/api/assignments`);
+                const assignments = await resAss.json();
+                const listEl = document.getElementById('assignments-list');
+                listEl.innerHTML = '';
+                
+                assignments.forEach(a => {
+                    const studentLink = `${window.location.origin}${window.location.pathname.replace('admin.html', '')}index.html?id=${a.id}`;
+                    listEl.innerHTML += `
+                        <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+                            <div>
+                                <h3 class="font-semibold text-slate-800">${a.title}</h3>
+                                <p class="text-xs text-slate-500">${a.description}</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <input type="text" readonly value="${studentLink}" class="bg-white border px-3 py-1 rounded text-xs text-slate-600 w-64 select-all">
+                                <button onclick="navigator.clipboard.writeText('${studentLink}')" class="bg-slate-200 hover:bg-slate-300 px-3 py-1 rounded text-xs font-medium">Копирай линк</button>
+                            </div>
+                        </div>`;
+                });
+
+                const resSub = await fetch(`${API_URL}/api/submissions`);
+                const submissions = await resSub.json();
+                const subListEl = document.getElementById('submissions-list');
+                subListEl.innerHTML = '';
+
+                submissions.forEach(s => {
+                    subListEl.innerHTML += `
+                        <tr class="border-b border-slate-100 hover:bg-slate-50">
+                            <td class="py-3 px-4 font-medium text-slate-800">${s.student_name}</td>
+                            <td class="py-3 px-4 text-slate-600">${s.assignments?.title || '—'}</td>
+                            <td class="py-3 px-4"><a href="${s.file_url}" target="_blank" class="text-indigo-600 hover:underline font-medium">Свали код</a></td>
+                            <td class="py-3 px-4"><input type="number" id="points-${s.id}" value="${s.points || 0}" class="w-16 border rounded px-2 py-1 text-center"></td>
+                            <td class="py-3 px-4"><input type="text" id="grade-${s.id}" value="${s.grade || ''}" placeholder="напр. 6" class="w-16 border rounded px-2 py-1 text-center"></td>
+                            <td class="py-3 px-4"><button onclick="updateGrade('${s.id}')" class="bg-slate-800 text-white px-3 py-1 rounded text-xs hover:bg-slate-700">Запиши</button></td>
+                        </tr>`;
+                });
+            } catch (err) {
+                console.error("Грешка при зареждане на данните:", err);
+            }
+        }
+
+        document.getElementById('create-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const title = document.getElementById('title').value;
+            const description = document.getElementById('description').value;
+
+            await fetch(`${API_URL}/api/assignments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, description })
+            });
+
+            document.getElementById('title').value = '';
+            document.getElementById('description').value = '';
+            loadData();
+        });
+
+        async function updateGrade(id) {
+            const points = document.getElementById(`points-${id}`).value;
+            const grade = document.getElementById(`grade-${id}`).value;
+
+            await fetch(`${API_URL}/api/submissions/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ points: Number(points), grade })
+            });
+            alert('Оценката е записана успешно!');
+            loadData();
+        }
+
+        loadData();
+    </script>
+</body>
+</html>
