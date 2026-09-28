@@ -62,40 +62,14 @@
     </div>
 
     <script>
-        const API_URL = "https://grading-platform-v2.onrender.com"; // Вашият Render линк
+        const API_URL = "https://grading-platform-v2.onrender.com";
 
         async function loadData() {
             try {
-                // Зареждане на задания
                 const resAss = await fetch(`${API_URL}/api/assignments`);
                 const assignments = await resAss.json();
-                const listEl = document.getElementById('assignments-list');
-                listEl.innerHTML = '';
-                
-                if (assignments.length === 0) {
-                    listEl.innerHTML = '<p class="text-sm text-slate-500">Все още няма създадени задания.</p>';
-                }
+                renderAssignments(assignments);
 
-                assignments.forEach(a => {
-                    // Генериране на линк спрямо текущия хост (GitHub Pages) или рутьовете
-                    const baseDomain = window.location.origin + window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
-                    const studentLink = `${baseDomain}index.html?id=${a.id}`;
-                    
-                    listEl.innerHTML += `
-                        <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-                            <div>
-                                <h3 class="font-semibold text-slate-800">${a.title}</h3>
-                                <p class="text-xs text-slate-500">${a.description}</p>
-                                ${a.reference_file_url ? `<a href="${a.reference_file_url}" target="_blank" class="text-xs text-indigo-600 hover:underline mt-1 inline-block">📄 Преглед на еталонен/помощен файл</a>` : ''}
-                            </div>
-                            <div class="flex items-center gap-2 w-full md:w-auto">
-                                <input type="text" readonly value="${studentLink}" class="bg-white border px-3 py-1.5 rounded-lg text-xs text-slate-600 w-full md:w-80 select-all">
-                                <button onclick="navigator.clipboard.writeText('${studentLink}'); alert('Линкът е копиран!');" class="bg-slate-200 hover:bg-slate-300 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap">Копирай</button>
-                            </div>
-                        </div>`;
-                });
-
-                // Зареждане на предадени материали
                 const resSub = await fetch(`${API_URL}/api/submissions`);
                 const submissions = await resSub.json();
                 const subListEl = document.getElementById('submissions-list');
@@ -113,8 +87,38 @@
                         </tr>`;
                 });
             } catch (err) {
-                console.error("Грешка при зареждане на данните:", err);
+                console.error("Грешка при връзка със сървъра:", err);
+                document.getElementById('assignments-list').innerHTML = '<p class="text-sm text-rose-500">Грешка при връзка с Render сървъра. Проверете дали е активен.</p>';
             }
+        }
+
+        function renderAssignments(assignments) {
+            const listEl = document.getElementById('assignments-list');
+            listEl.innerHTML = '';
+            
+            if (!assignments || assignments.length === 0) {
+                listEl.innerHTML = '<p class="text-sm text-slate-500">Все още няма създадени задания.</p>';
+                return;
+            }
+
+            assignments.forEach(a => {
+                // Изчисляване на студентския линк (взима базовия URL на GitHub Pages и сочи към index.html с id на задачата)
+                const baseDomain = window.location.origin + window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
+                const studentLink = `${baseDomain}index.html?id=${a.id}`;
+                
+                listEl.innerHTML += `
+                    <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                        <div>
+                            <h3 class="font-semibold text-slate-800">${a.title}</h3>
+                            <p class="text-xs text-slate-500">${a.description}</p>
+                            ${a.reference_file_url ? `<a href="${a.reference_file_url}" target="_blank" class="text-xs text-indigo-600 hover:underline mt-1 inline-block">📄 Преглед на еталонен/помощен файл</a>` : ''}
+                        </div>
+                        <div class="flex items-center gap-2 w-full md:w-auto">
+                            <input type="text" readonly value="${studentLink}" class="bg-white border px-3 py-1.5 rounded-lg text-xs text-slate-600 w-full md:w-80 select-all">
+                            <button onclick="navigator.clipboard.writeText('${studentLink}'); alert('Линкът е копиран!');" class="bg-slate-200 hover:bg-slate-300 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap">Копирай</button>
+                        </div>
+                    </div>`;
+            });
         }
 
         document.getElementById('create-form').addEventListener('submit', async (e) => {
@@ -128,13 +132,26 @@
                 formData.append('referenceFile', refFile);
             }
 
-            await fetch(`${API_URL}/api/assignments`, {
-                method: 'POST',
-                body: formData
-            });
+            // Показваме временно съобщение, че се създава задачата
+            const listEl = document.getElementById('assignments-list');
+            listEl.innerHTML = '<p class="text-sm text-indigo-600">Създаване на задачата и качване на файла...</p>';
 
-            document.getElementById('create-form').reset();
-            loadData();
+            try {
+                const response = await fetch(`${API_URL}/api/assignments`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    document.getElementById('create-form').reset();
+                    loadData(); // Презареждане на списъка
+                } else {
+                    alert('Грешка при създаване на задачата.');
+                }
+            } catch (err) {
+                alert('Сървърът не отговаря. Възможно е Render да се събужда (отнема до 50 сек). Опитайте пак.');
+                loadData();
+            }
         });
 
         async function updateGrade(id) {
